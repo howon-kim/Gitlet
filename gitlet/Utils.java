@@ -14,9 +14,11 @@ import java.nio.file.Paths;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.text.SimpleDateFormat;
 import java.util.Arrays;
 import java.util.Formatter;
 import java.util.List;
+import java.util.TimeZone;
 
 
 /** Assorted utilities.
@@ -242,6 +244,13 @@ class Utils {
     abstract static class Function<T1, T2> {
         /** Returns the value of this function on X. */
         abstract T2 apply(T1 x);
+    }
+
+    /** CUSTOM FUNCTION */
+    static String makeTimeStamp(Object obj) {
+        SimpleDateFormat date = new SimpleDateFormat("HH:mm:ss z, EEEE, d MMMM yyyy");
+        date.setTimeZone(TimeZone.getTimeZone("UTC"));
+        return date.format(obj);
     }
 
 }
