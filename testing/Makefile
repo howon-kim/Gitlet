@@ -11,13 +11,13 @@ SHELL = /bin/bash
 JFLAGS = -ea
 
 # See comment in ../Makefile
-PYTHON = python3
+PYTHON = python
 
 RMAKE = "$(MAKE)"
 
 TESTER = CLASSPATH="$$(pwd)/..:$(CLASSPATH):;$$(pwd)/..;$(CLASSPATH)" $(PYTHON) tester.py
 
-TESTER_FLAGS =
+TESTER_FLAGS ="--show=all --keep"
 
 TESTS = samples/*.in *.in
 

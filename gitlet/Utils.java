@@ -248,7 +248,8 @@ class Utils {
 
     /** CUSTOM FUNCTION */
     static String makeTimeStamp(Object obj) {
-        SimpleDateFormat date = new SimpleDateFormat("HH:mm:ss z, EEEE, d MMMM yyyy");
+        //SimpleDateFormat date = new SimpleDateFormat("HH:mm:ss z, EEEE, d MMMM yyyy");
+        SimpleDateFormat date = new SimpleDateFormat("EE MMM d HH:mm:ss yyyy Z");
         date.setTimeZone(TimeZone.getTimeZone("UTC"));
         return date.format(obj);
     }

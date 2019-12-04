@@ -34,6 +34,13 @@ public class Main {
                 if (args.length <= 1) { System.out.println(Utils.error("Please enter a commit message.").getMessage()); }
                 else { cmdcommit(args[1]); }
                 break;
+            case "checkout":
+                if (args.length <= 1) { System.out.println(Utils.error("Please enter a commit message.").getMessage()); }
+                else { cmdcheckout(Arrays.copyOfRange(args, 1, args.length)); }
+                break;
+            case "log":
+                cmdlog();
+                break;
             default:
                 throw Utils.error("No command with that name exists.");
         }
@@ -107,6 +114,81 @@ public class Main {
             CommitTree commitTree = Utils.readObject(commitFile, CommitTree.class);
             commitTree.addCommit(newCommit);
             Utils.writeObject(commitFile, commitTree);
+            stageFile.delete();
+        }
+    }
+
+    public static void cmdcheckout(String... args) {
+        File file = new File(FILEPATH);
+        File commitFile = new File(COMMITPATH);
+        File stageFile = new File(STAGEPATH);
+
+        if (args[0].equals("--")) {
+            Commit current = Utils.readObject(commitFile, CommitTree.class).getCurrentCommit();
+            HashMap<String, Blob> files = current.getFiles();
+            if (files.containsKey(args[1])) {
+                Utils.writeContents(new File(args[1]), files.get(args[1]).getContent());
+            } else {
+                throw Utils.error("File does not exist in that commit.");
+            }
+        } else if (args[1].equals("--")) {
+            CommitTree commitTree = Utils.readObject(commitFile, CommitTree.class);
+            Commit foundCommit = commitTree.findCommit(args[0]);
+            if (foundCommit != null) {
+                HashMap<String, Blob> files = foundCommit.getFiles();
+                if (files.containsKey(args[2])) {
+                    Utils.writeContents(new File(args[2]), files.get(args[2]).getContent());
+                } else {
+                    System.out.println(Utils.error("File does not exist in that commit.").getMessage());
+                }
+            } else {
+                System.out.println(Utils.error("No commit with that id exists.").getMessage());
+            }
+        } else {
+            CommitTree commitTree = Utils.readObject(commitFile, CommitTree.class);
+            Commit foundBranch = commitTree.findBranchCommit(args[0]);
+
+            if (commitTree.getCurrentBranch() == args[0]) {
+                System.out.println(Utils.error("No need to checkout the current branch.").getMessage());
+            } else if (foundBranch != null) {
+                if(stageFile.exists()) {
+                    Stage stage = Utils.readObject(stageFile, Stage.class);
+                    HashMap<String, Blob> stageFiles = stage.getBlobs();
+                    for (Map.Entry entry: foundBranch.getFiles().entrySet()) {
+                        String key = (String) entry.getKey();
+                        Blob blob = (Blob) entry.getValue();
+                        if (stageFiles.containsKey(key)) {
+                            throw Utils.error("There is an untracked file in the way; delete it or add it first.");
+                        }
+                    }
+                }
+                for (Map.Entry entry: foundBranch.getFiles().entrySet()) {
+                    String key = (String) entry.getKey();
+                    Blob blob = (Blob) entry.getValue();
+                    Utils.writeObject(new File(key), blob);
+                }
+                commitTree.putCurrentBranch(args[0]);
+                Utils.writeObject(commitFile, commitTree);
+                stageFile.delete();
+            } else {
+                System.out.println(Utils.error( "No such branch exists.").getMessage());
+            }
+        }
+    }
+
+    public static void cmdlog() {
+        File commitFile = new File(COMMITPATH);
+        CommitTree commitTree = Utils.readObject(commitFile, CommitTree.class);
+        LinkedList<Commit> commits = commitTree.getCurrentBranchCommits();
+        ListIterator commitsIter = commits.listIterator();
+
+        while (commitsIter.hasNext()) {
+            Commit commit = (Commit) commitsIter.next();
+            System.out.println("===");
+            System.out.println("commit " + commit.hashID);
+            System.out.println("Date: " + commit.getTimestamp());
+            System.out.println(commit.getComment());
+            System.out.println();
         }
     }
 

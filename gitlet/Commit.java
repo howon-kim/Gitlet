@@ -3,9 +3,7 @@ package gitlet;
 import java.io.Serializable;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.TimeZone;
+import java.util.*;
 
 public class Commit implements Serializable {
     String hashID;
@@ -28,12 +26,21 @@ public class Commit implements Serializable {
         this.timestamp = Utils.makeTimeStamp(timestamp);
         this.files = files;
         this.parent = parent;
-        this.hashID = Utils.sha1(files.keySet().toArray());
+        List<Object> hashKeys = new ArrayList<>();
+        for (Map.Entry entry: files.entrySet()) {
+            String key = (String) entry.getKey();
+            Blob blob = (Blob) entry.getValue();
+            hashKeys.add(key);
+            hashKeys.add(blob.getContent());
+        }
+        this.hashID = Utils.sha1(hashKeys.toArray());
     }
 
     public String getHashID(){
         return hashID;
     }
+    public String getTimestamp() { return timestamp; }
+    public String getComment() { return comment; }
 
     public boolean checkBlobEquality(String fileName, Blob compare) {
         if (files.containsKey(fileName)) {
