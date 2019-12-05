@@ -4,11 +4,46 @@ Gitlet Design Document
 
 Classes and Data Structures
 ---------------------------
+Blob Class
+    private byte[] content; // Contents of file in byte [] type
+    private String hashID; // Each file's unique SHA1 
 
+
+Commit Class  
+    String hashID; // Each Commit's unique SHA1
+    String comment; // Commit's comment
+    String timestamp; // Commit time
+    Commit parent; // Its parent commit
+    HashMap<String, Blob> files; // Files in commit
+
+CommitTree Class
+    HashMap<String, LinkedList<Commit>> commits; // Store Commit with branch key
+    HashMap<String, Commit> commitsCopy; // Copy of all commits to access in faster speed.
+    String currentBranch; // Current Branch name
+
+Main Class
+    static String FILEPATH = ".gitlet"; // Easy way to access file path.
+    static String STAGEPATH = ".gitlet/.STAGE";
+    static String COMMITPATH = ".gitlet/.COMMIT";
 
 Algorithms
 ----------
+Blob Class
+- To prevent user is saving unexisted file, add a if statement to check that file is actually exist on the file path, if then proceed to store data to Blob object.
+
+Commit Class
+- For dangerous of duplicated SHA1 unique key, the constructor pass every file names and each contents to make SHA1 key.
+
+CommitTree Class
+- Since default branch name is usually "master", default constructor without input parameter automatically put branch name as "master", it user make another branch, 
+it goes to overloaded method.
+
+Main Class
+- All commands and its edge case saved as different command methods.
+For example, in checkout funciton, I check there is matched commit ID and file name.
 
 
 Persistence
 -----------
+I save all commit, stage information into the text files. For instance, commit in .COMMIT file and stage files in .STAGE.
+So, everytime user run the program in new session, it always read file from .gitlet directory, so all commit, branch, stage information would not be lost.
