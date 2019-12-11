@@ -250,7 +250,8 @@ class Utils {
     static String makeTimeStamp(Object obj) {
         //SimpleDateFormat date = new SimpleDateFormat("HH:mm:ss z, EEEE, d MMMM yyyy");
         SimpleDateFormat date = new SimpleDateFormat("EE MMM d HH:mm:ss yyyy Z");
-        date.setTimeZone(TimeZone.getTimeZone("UTC"));
+        //date.setTimeZone(TimeZone.getTimeZone("UTC"));
+        date.setTimeZone(TimeZone.getDefault());
         return date.format(obj);
     }
 

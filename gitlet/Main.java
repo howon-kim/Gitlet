@@ -15,6 +15,7 @@ public class Main {
     static String FILEPATH = ".gitlet";
     static String STAGEPATH = ".gitlet/.STAGE";
     static String COMMITPATH = ".gitlet/.COMMIT";
+    static String WORKINGPATH = System.getProperty("user.dir");
 
     public static void main(String... args) {
 
@@ -31,7 +32,7 @@ public class Main {
                 cmdadd(args[1]);
                 break;
             case "commit":
-                if (args.length <= 1) { System.out.println(Utils.error("Please enter a commit message.").getMessage()); }
+                if (args.length <= 1 || args[1].isEmpty()) { System.out.println(Utils.error("Please enter a commit message.").getMessage()); }
                 else { cmdcommit(args[1]); }
                 break;
             case "checkout":
@@ -40,6 +41,20 @@ public class Main {
                 break;
             case "log":
                 cmdlog();
+                break;
+            case "global-log":
+                cmdgloballog();
+                break;
+            case "find":
+                if (args.length <= 1) { throw Utils.error("Incorrect operands"); }
+                cmdfind(args[1]);
+                break;
+            case "status":
+                cmdstatus();
+                break;
+            case "rm":
+                if (args.length <= 1) { throw Utils.error("Incorrect operands"); }
+                cmdrm(args[1]);
                 break;
             default:
                 throw Utils.error("No command with that name exists.");
@@ -65,30 +80,37 @@ public class Main {
             file = new File(COMMITPATH);
             Utils.writeObject(file, commitTree);
 
+            Stage stage = new Stage();
+            Utils.writeObject(new File(STAGEPATH), stage);
         }
     }
 
     public static void cmdadd(String... args) {
         File file = new File(FILEPATH);
         File stageFile = new File(STAGEPATH);
+        File addedFile = new File(args[0]);
         if (!file.exists()) {
-            System.out.println(Utils.error("Not in an initialized Gitlet directory."));
+            System.out.println(Utils.error("Not in an initialized Gitlet directory.").getMessage());
+        } else if (!addedFile.exists()) {
+            System.out.println(Utils.error("File does not exist.").getMessage());
         } else {
             Stage stage = new Stage();
-            if (stageFile.exists()) {
-                stage = Utils.readObject(stageFile, Stage.class);
-            }
+            stage = Utils.readObject(stageFile, Stage.class);
 
             Blob blob = new Blob(args[0]);
-            Commit current = Utils.readObject(new File(COMMITPATH), CommitTree.class).getCurrentCommit();
+            CommitTree commitTree = Utils.readObject(new File(COMMITPATH), CommitTree.class);
+            Commit current = commitTree.getCurrentCommit();
             //File filepath = Utils.join(STAGEPATH, blob.getHashID());
             //Utils.writeObject(filepath, blob);
             //Utils.readObject(filepath, Blob.class);
 
-
             if (!current.checkBlobEquality(args[0], blob)) {
                 stage.addBlob(args[0], blob);
                 Utils.writeObject(stageFile, stage);
+            } else {
+                if(current.getFiles().get(args[0]).addTrack()) {
+                    Utils.writeObject(new File(COMMITPATH), commitTree);
+                }
             }
         }
     }
@@ -97,25 +119,35 @@ public class Main {
         File file = new File(FILEPATH);
         File stageFile = new File(STAGEPATH);
         File commitFile = new File(COMMITPATH);
-        if (!stageFile.exists()) {
-            System.out.println(Utils.error("No changes added to the commit."));
+        if (Utils.readObject(stageFile, Stage.class).getBlobs().isEmpty() && Utils.readObject(commitFile, CommitTree.class).getUntrackedFile().isEmpty()) {
+            System.out.println(Utils.error("No changes added to the commit.").getMessage());
         } else {
             Commit current = Utils.readObject(new File(COMMITPATH), CommitTree.class).getCurrentCommit();
             Stage stage = Utils.readObject(stageFile, Stage.class);
             HashMap<String, Blob> files = current.getFiles();
 
-            for (Map.Entry entry: stage.getBlobs().entrySet()) {
-                String key = (String) entry.getKey();
-                Blob blob = (Blob) entry.getValue();
-                files.put(key, blob);
+            if (!Utils.readObject(stageFile, Stage.class).getBlobs().isEmpty()) {
+                for (Map.Entry entry : stage.getBlobs().entrySet()) {
+                    String key = (String) entry.getKey();
+                    Blob blob = (Blob) entry.getValue();
+                    files.put(key, blob);
+                }
+            }
+            if (!Utils.readObject(commitFile, CommitTree.class).getUntrackedFile().isEmpty()) {
+                for (String fileName : Utils.readObject(commitFile, CommitTree.class).getUntrackedFile()) {
+                    files.remove(fileName);
+                }
+                Utils.readObject(commitFile, CommitTree.class).clearRemovedFile();
             }
 
-            Commit newCommit = new Commit(args[0], Instant.now().getEpochSecond(), files, current);
+            Commit newCommit = new Commit(args[0], files, current);
             CommitTree commitTree = Utils.readObject(commitFile, CommitTree.class);
             commitTree.addCommit(newCommit);
             Utils.writeObject(commitFile, commitTree);
-            stageFile.delete();
+            Utils.writeObject(stageFile, new Stage());
         }
+
+
     }
 
     public static void cmdcheckout(String... args) {
@@ -176,6 +208,9 @@ public class Main {
         }
     }
 
+    /***
+     * Starting at the current head commit, display information about each commit
+     */
     public static void cmdlog() {
         File commitFile = new File(COMMITPATH);
         CommitTree commitTree = Utils.readObject(commitFile, CommitTree.class);
@@ -190,6 +225,121 @@ public class Main {
             System.out.println(commit.getComment());
             System.out.println();
         }
+    }
+
+    /***
+     * Like log, except displays information about all commits ever made.
+     * The order of the commits does not matter.
+     */
+    public static void cmdgloballog() {
+        File commitFile = new File(COMMITPATH);
+        CommitTree commitTree = Utils.readObject(commitFile, CommitTree.class);
+        HashMap<String, Commit> commits = commitTree.getAllCommits();
+
+        for (Commit entry : commits.values()) {
+            System.out.println("===");
+            System.out.println("commit " + entry.getHashID());
+            System.out.println("Date: " + entry.getTimestamp());
+            System.out.println(entry.getComment());
+            System.out.println();
+    }
+}
+
+    /***
+     * Prints out the ids of all commits that have the given commit message, one per line.
+     */
+    public static void cmdfind(String ...args) {
+        File commitFile = new File(COMMITPATH);
+        CommitTree commitTree = Utils.readObject(commitFile, CommitTree.class);
+        HashMap<String, Commit> commits = commitTree.getAllCommits();
+        Boolean isFound = false;
+
+        for (Commit entry : commits.values()) {
+            if (entry.getComment().equals(args[0])) {
+                isFound = true;
+                System.out.println(entry.getHashID());
+            }
+        }
+
+        if (isFound == false) {
+            System.out.println(Utils.error("Found no commit with that message.").getMessage());
+        }
+    }
+
+    /***
+     * Displays what branches currently exist, and marks the current branch with a *.
+     * Also displays what files have been staged or marked for untracking.
+     */
+    public static void cmdstatus() {
+        //for (String name: Utils.plainFilenamesIn(WORKINGPATH)) {
+         //   System.out.println(name);
+        //}
+        File commitFile = new File(COMMITPATH);
+        File stageFile = new File(STAGEPATH);
+        CommitTree commitTree = Utils.readObject(commitFile, CommitTree.class);
+        HashMap<String, LinkedList<Commit>> commits = commitTree.getCommitsBranch();
+        System.out.println("=== Branches ===");
+        for (String branch: commits.keySet()) {
+            if (branch == commitTree.currentBranch) {
+                System.out.println("*" + branch);
+            } else {
+                System.out.println(branch);
+            }
+        }
+
+        Stage stage = Utils.readObject(stageFile, Stage.class);
+        System.out.println("\n=== Staged Files ===");
+        List<String> stageFiles = new ArrayList<>();
+        for (String fileName: stage.getBlobs().keySet()) {
+            stageFiles.add(fileName);
+        }
+        Collections.sort(stageFiles);
+        for (String fileName: stageFiles) {
+            System.out.println(fileName);
+        }
+
+        Commit currentCommit = commitTree.getCurrentCommit();
+        HashMap<String, Blob> currentFiles = currentCommit.getFiles();
+        System.out.println("\n=== Removed Files ===");
+        for (Map.Entry entry: currentFiles.entrySet()) {
+            String f = (String) entry.getKey();
+            Blob b = (Blob) entry.getValue();
+            if (b.getIsTracked() == false) {
+                System.out.println(f);
+            }
+        }
+
+        System.out.println("\n=== Modifications Not Staged For Commit ===");
+        System.out.println("\n=== Untracked Files ===");
+
+
+//!!!! EXTRA CREDIT SESSION
+
+
+    }
+
+    public static void cmdrm(String ...args) {
+        CommitTree commitTree = Utils.readObject(new File(COMMITPATH), CommitTree.class);
+        Stage stage = Utils.readObject(new File(STAGEPATH), Stage.class);
+        Boolean isDeleted = false;
+        if (stage.deleteBlob(args[0])) {
+            Utils.writeObject(new File(STAGEPATH), stage);
+            isDeleted = true;
+        }
+
+        Commit currentCommit = commitTree.getCurrentCommit();
+        if (currentCommit.getFiles().containsKey(args[0])) {
+            currentCommit.getFiles().get(args[0]).removeTrack();
+            Utils.restrictedDelete(args[0]);
+            commitTree.removeFile(args[0]);
+            Utils.writeObject(new File(COMMITPATH), commitTree);
+            isDeleted = true;
+        }
+
+        if (isDeleted == false) {
+            System.out.println(Utils.error("No reason to remove the file.").getMessage());
+        }
+
     }
 
 

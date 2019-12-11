@@ -7,12 +7,12 @@ public class Blob<T> implements Serializable {
 
     private byte[] content;
     private String hashID;
-    //private Boolean isChanged;
+    private Boolean isTracked;
 
     public Blob() {
         content = null;
         hashID = null;
-        //isChanged = false;
+        isTracked = true;
     }
 
     public Blob(String filename) {
@@ -21,7 +21,7 @@ public class Blob<T> implements Serializable {
             System.out.println(Utils.error("File does not exist.").getMessage());
         } else {
             content = Utils.readContents(file);
-            //isChanged = true;
+            isTracked = true;
             hashID = Utils.sha1(content);
         }
     }
@@ -34,4 +34,25 @@ public class Blob<T> implements Serializable {
         return content;
     }
 
+    public Boolean getIsTracked() {
+        return isTracked;
+    }
+
+    public Boolean removeTrack() {
+        if (isTracked == false) {
+            return false;
+        } else {
+            isTracked = false;
+            return true;
+        }
+    }
+
+    public Boolean addTrack() {
+        if (isTracked == true) {
+            return false;
+         } else {
+            isTracked = true;
+            return true;
+        }
+    }
 }
