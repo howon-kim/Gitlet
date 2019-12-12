@@ -12,26 +12,41 @@ public class CommitTree implements Serializable {
     HashMap<String, Commit> commitsCopy;
     HashMap<String, ArrayList<String>> untracked;
     String currentBranch;
+    HashMap<String, String> head;
+
 
     public CommitTree() {
         commits = new HashMap<>();
         commitsCopy = new HashMap<>();
         currentBranch = DEFAULT_BRANCH;
         untracked = new HashMap<>();
+        head = new HashMap<>();
+    }
+
+    public void addBranch(String branch) {
+        if (commits.containsKey(branch)) {
+            System.out.println(Utils.error("A branch with that name already exists.").getMessage());
+        } else {
+            LinkedList<Commit> newBranch = new LinkedList<>();
+            commits.put(branch, new LinkedList<>());
+            head.put(branch, head.get(currentBranch));
+            untracked.put(branch, new ArrayList<>());
+        }
     }
 
     public void addCommit(Commit commit) {
-        if (commits.get(DEFAULT_BRANCH) == null) {
+        if (commits.get(currentBranch) == null) {
             LinkedList<Commit> commits = new LinkedList<>();
             commits.addFirst(commit);
-            this.commits.put(DEFAULT_BRANCH, commits);
+            this.commits.put(currentBranch, commits);
             ArrayList<String> deleted = new ArrayList<>();
-            untracked.put(DEFAULT_BRANCH, deleted);
+            untracked.put(currentBranch, deleted);
         } else {
-            LinkedList<Commit> commits = this.commits.get(DEFAULT_BRANCH);
+            LinkedList<Commit> commits = this.commits.get(currentBranch);
             commits.addFirst(commit);
-            this.commits.put(DEFAULT_BRANCH, commits);
+            this.commits.put(currentBranch, commits);
         }
+        head.put(currentBranch, commit.getHashID());
         commitsCopy.put(commit.getHashID(), commit);
     }
 
@@ -45,11 +60,12 @@ public class CommitTree implements Serializable {
             commits.addFirst(commit);
             this.commits.put(branch, commits);
         }
+        head.put(branch, commit.getHashID());
         commitsCopy.put(commit.getHashID(), commit);
     }
 
     public List<String> getUntrackedFile() {
-        return untracked.get(DEFAULT_BRANCH);
+        return untracked.get(currentBranch);
     }
 
     public List<String> getUntrackedFile(String branch) {
@@ -58,7 +74,7 @@ public class CommitTree implements Serializable {
 
     public void clearRemovedFile() {
         ArrayList<String> deleted = new ArrayList<>();
-        untracked.put(DEFAULT_BRANCH, deleted);
+        untracked.put(currentBranch, deleted);
     }
 
     public void clearRemovedFile(String branch) {
@@ -67,9 +83,9 @@ public class CommitTree implements Serializable {
     }
 
     public void removeFile(String file) {
-        if (commits.containsKey(DEFAULT_BRANCH)) {
-            if (commits.get(DEFAULT_BRANCH).getFirst().getFiles().containsKey(file)) {
-                untracked.get(DEFAULT_BRANCH).add(file);
+        if (commits.containsKey(currentBranch)) {
+            if (commits.get(currentBranch).getFirst().getFiles().containsKey(file)) {
+                untracked.get(currentBranch).add(file);
             }
         }
     }
