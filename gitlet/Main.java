@@ -37,7 +37,7 @@ public class Main {
                 break;
             case "checkout":
                 if (args.length <= 1) { System.out.println(Utils.error("Please enter a commit message.").getMessage()); }
-                if (args.length > 2 && !args[2].equals("--")) {System.out.println(Utils.error("Incorrect operands").getMessage()); }
+                if (args.length == 4 && !args[2].equals("--")) {System.out.println(Utils.error("Incorrect operands").getMessage());}
                 else { cmdcheckout(Arrays.copyOfRange(args, 1, args.length)); }
                 break;
             case "log":
@@ -57,13 +57,13 @@ public class Main {
                 if (args.length <= 1) { throw Utils.error("Incorrect operands"); }
                 cmdrm(args[1]);
                 break;
-            case "branch":
-                if (args.length <= 1) { throw Utils.error("Incorrect operands"); }
-                cmdbranch(args[1]);
-                break;
             case "reset":
                 if (args.length <= 1) { throw Utils.error("Incorrect operands"); }
                 cmdreset(args[1]);
+                break;
+            case "branch":
+                if (args.length <= 1) { throw Utils.error("Incorrect operands"); }
+                cmdbranch(args[1]);
                 break;
             default:
                 throw Utils.error("No command with that name exists.");
@@ -103,12 +103,12 @@ public class Main {
         } else if (!addedFile.exists()) {
             System.out.println(Utils.error("File does not exist.").getMessage());
         } else {
-            Stage stage = new Stage();
-            stage = Utils.readObject(stageFile, Stage.class);
+
+            Stage stage = Utils.readObject(stageFile, Stage.class);
 
             Blob blob = new Blob(args[0]);
             CommitTree commitTree = Utils.readObject(new File(COMMITPATH), CommitTree.class);
-            Commit current = commitTree.findCommit(commitTree.head.get(commitTree.currentBranch));
+            Commit current = commitTree.getCurrentCommit();
             //File filepath = Utils.join(STAGEPATH, blob.getHashID());
             //Utils.writeObject(filepath, blob);
             //Utils.readObject(filepath, Blob.class);
@@ -131,12 +131,12 @@ public class Main {
         if (Utils.readObject(stageFile, Stage.class).getBlobs().isEmpty() && Utils.readObject(commitFile, CommitTree.class).getUntrackedFile().isEmpty()) {
             System.out.println(Utils.error("No changes added to the commit.").getMessage());
         } else {
-            CommitTree commitTree = Utils.readObject(new File(COMMITPATH), CommitTree.class);
-            Commit current = commitTree.findCommit(commitTree.head.get(commitTree.currentBranch));
+            CommitTree commitTree = Utils.readObject(commitFile, CommitTree.class);
+            Commit current = Utils.readObject(new File(COMMITPATH), CommitTree.class).getCurrentCommit();
             Stage stage = Utils.readObject(stageFile, Stage.class);
             HashMap<String, Blob> files = current.getFiles();
 
-            if (!stage.getBlobs().isEmpty()) {
+            if (!Utils.readObject(stageFile, Stage.class).getBlobs().isEmpty()) {
                 for (Map.Entry entry : stage.getBlobs().entrySet()) {
                     String key = (String) entry.getKey();
                     Blob blob = (Blob) entry.getValue();
@@ -150,9 +150,9 @@ public class Main {
                 commitTree.clearRemovedFile();
             }
 
+
             Commit newCommit = new Commit(args[0], files, current);
             commitTree.addCommit(newCommit);
-            commitTree.head.put(commitTree.currentBranch, newCommit.getHashID());
             Utils.writeObject(commitFile, commitTree);
             Utils.writeObject(stageFile, new Stage());
         }
@@ -173,7 +173,7 @@ public class Main {
             } else {
                 throw Utils.error("File does not exist in that commit.");
             }
-        } else if (args.length > 1 && args[1].equals("--")) {
+        } else if (args.length == 3 && args[1].equals("--")) {
             CommitTree commitTree = Utils.readObject(commitFile, CommitTree.class);
             Commit foundCommit = commitTree.findCommit(args[0]);
             if (foundCommit != null) {
@@ -188,7 +188,7 @@ public class Main {
             }
         } else {
             CommitTree commitTree = Utils.readObject(commitFile, CommitTree.class);
-            Commit foundBranch = commitTree.commitsCopy.get(commitTree.head.get(args[0]));
+            Commit foundBranch = commitTree.findBranchCommit(args[0]);
 
             if (commitTree.getCurrentBranch().equals(args[0])) {
                 System.out.println(Utils.error("No need to checkout the current branch.").getMessage());
@@ -204,31 +204,20 @@ public class Main {
                         }
                     }
                 }
-                /**
+                List<String> existedFiles = Utils.plainFilenamesIn(new File(WORKINGPATH));
+
+                for (String e: existedFiles) {
+                    Utils.restrictedDelete(e);
+                }
+
                 for (Map.Entry entry: foundBranch.getFiles().entrySet()) {
                     String key = (String) entry.getKey();
                     Blob blob = (Blob) entry.getValue();
                     Utils.writeObject(new File(key), blob);
                 }
-                 **/
-                Stage stage = Utils.readObject(stageFile, Stage.class);
-                HashMap<String, Blob> files = foundBranch.getFiles();
-                List<String> CurrentFiles = Utils.plainFilenamesIn(new File(WORKINGPATH));
-                for (Map.Entry entry : stage.getBlobs().entrySet()) {
-                    Utils.writeObject(new File((String) entry.getKey()), (Blob) entry.getValue());
-                    if (CurrentFiles.contains((String) entry.getKey())) {
-                        CurrentFiles.remove((String) entry.getKey());
-                    }
-                }
-                for (String c : CurrentFiles){
-                    Utils.restrictedDelete(new File(c));
-                }
-                Utils.writeObject(new File(STAGEPATH), new Stage());
                 commitTree.putCurrentBranch(args[0]);
-                commitTree.head.put(args[0], foundBranch.getHashID());
                 Utils.writeObject(commitFile, commitTree);
-
-
+                Utils.writeObject(stageFile, new Stage());
             } else {
                 System.out.println(Utils.error( "No such branch exists.").getMessage());
             }
@@ -241,7 +230,7 @@ public class Main {
     public static void cmdlog() {
         File commitFile = new File(COMMITPATH);
         CommitTree commitTree = Utils.readObject(commitFile, CommitTree.class);
-        LinkedList<Commit> commits = commitTree.getCurrentBranchCommits();
+        ArrayList<Commit> commits = commitTree.getCurrentBranchCommits();
         ListIterator commitsIter = commits.listIterator();
 
         while (commitsIter.hasNext()) {
@@ -269,8 +258,8 @@ public class Main {
             System.out.println("Date: " + entry.getTimestamp());
             System.out.println(entry.getComment());
             System.out.println();
+        }
     }
-}
 
     /***
      * Prints out the ids of all commits that have the given commit message, one per line.
@@ -299,12 +288,12 @@ public class Main {
      */
     public static void cmdstatus() {
         //for (String name: Utils.plainFilenamesIn(WORKINGPATH)) {
-         //   System.out.println(name);
+        //   System.out.println(name);
         //}
         File commitFile = new File(COMMITPATH);
         File stageFile = new File(STAGEPATH);
         CommitTree commitTree = Utils.readObject(commitFile, CommitTree.class);
-        HashMap<String, LinkedList<Commit>> commits = commitTree.getCommitsBranch();
+        HashMap<String, ArrayList<Commit>> commits = commitTree.getCommitsBranch();
         System.out.println("=== Branches ===");
         for (String branch: commits.keySet()) {
             if (branch == commitTree.currentBranch) {
@@ -357,8 +346,8 @@ public class Main {
         Commit currentCommit = commitTree.getCurrentCommit();
         if (currentCommit.getFiles().containsKey(args[0])) {
             currentCommit.getFiles().get(args[0]).removeTrack();
-            Utils.restrictedDelete(args[0]);
             commitTree.removeFile(args[0]);
+            Utils.restrictedDelete(args[0]);
             Utils.writeObject(new File(COMMITPATH), commitTree);
             isDeleted = true;
         }
@@ -371,33 +360,25 @@ public class Main {
 
     public static void cmdbranch(String ...args) {
         CommitTree commitTree = Utils.readObject(new File(COMMITPATH), CommitTree.class);
-        commitTree.addBranch(args[0]);
-        commitTree.currentBranch = args[0];
+        if (commitTree.findBranch(args[0])) {
+            System.out.println("branch with that name already exists.");
+        } else {
+            commitTree.addBranch(args[0]);
+        }
+
         Utils.writeObject(new File(COMMITPATH), commitTree);
+
     }
 
     public static void cmdreset(String ...args) {
         CommitTree commitTree = Utils.readObject(new File(COMMITPATH), CommitTree.class);
+        ArrayList<Commit> commits = commitTree.getCurrentBranchCommits();
         if (!commitTree.commitsCopy.containsKey(args[0])) {
-            System.out.println(Utils.error(" No commit with that id exists.").getMessage());
+            System.out.println(Utils.error("No commit with that id exists.").getMessage());
+        } else {
+            Commit commit = commitTree.commitsCopy.get(args[0]);
+            commitTree.head.put(commitTree.getCurrentBranch(), commit);
         }
-        Commit commit = commitTree.commitsCopy.get(args[0]);
-        List<String> workingFiles = Utils.plainFilenamesIn(WORKINGPATH);
-        HashMap<String, Blob> files = commit.getFiles();
-
-        for (int i = 0; i < workingFiles.size() ; i++) {
-            if (!files.containsKey(workingFiles.get(i))) {
-                System.out.println(workingFiles.get(i));
-                throw Utils.error("There is an untracked file in the way; delete it or add it first");
-            }
-        }
-
-        Utils.writeObject(new File(STAGEPATH), new Stage());
-        commitTree.head.put(commitTree.currentBranch, args[0]);
-        Utils.writeObject(new File(COMMITPATH), commitTree);
-
-
-
     }
 
 

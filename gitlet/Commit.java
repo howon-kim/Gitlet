@@ -33,6 +33,7 @@ public class Commit implements Serializable {
             hashKeys.add(key);
             hashKeys.add(blob.getContent());
         }
+        hashKeys.add(this.timestamp);
         this.hashID = Utils.sha1(hashKeys.toArray());
     }
 

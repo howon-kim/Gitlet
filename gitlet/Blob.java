@@ -50,7 +50,7 @@ public class Blob<T> implements Serializable {
     public Boolean addTrack() {
         if (isTracked == true) {
             return false;
-         } else {
+        } else {
             isTracked = true;
             return true;
         }
