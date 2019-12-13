@@ -42,6 +42,11 @@ public class CommitTree implements Serializable {
         head.put(currentBranch, commit);
     }
 
+    public void removeBranch(String branch) {
+        commits.remove(branch);
+        untracked.remove(branch);
+        head.remove(branch);
+    }
     public void addBranch(String branch) {
         ArrayList<Commit> commits = new ArrayList<>();
         commits.add(0, head.get(currentBranch));

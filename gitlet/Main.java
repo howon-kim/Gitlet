@@ -65,6 +65,10 @@ public class Main {
                 if (args.length <= 1) { throw Utils.error("Incorrect operands"); }
                 cmdbranch(args[1]);
                 break;
+            case "rm-branch":
+                if (args.length <= 1) { throw Utils.error("Incorrect operands"); }
+                cmdrmbranch(args[1]);
+                break;
             default:
                 throw Utils.error("No command with that name exists.");
         }
@@ -189,13 +193,13 @@ public class Main {
         } else {
             CommitTree commitTree = Utils.readObject(commitFile, CommitTree.class);
             Commit foundBranch = commitTree.findBranchCommit(args[0]);
-
+            Boolean error = false;
             if (commitTree.getCurrentBranch().equals(args[0])) {
                 System.out.println(Utils.error("No need to checkout the current branch.").getMessage());
             } else if (foundBranch != null) {
+                Stage stage = Utils.readObject(stageFile, Stage.class);
+                HashMap<String, Blob> stageFiles = stage.getBlobs();
                 if(stageFile.exists()) {
-                    Stage stage = Utils.readObject(stageFile, Stage.class);
-                    HashMap<String, Blob> stageFiles = stage.getBlobs();
                     for (Map.Entry entry: foundBranch.getFiles().entrySet()) {
                         String key = (String) entry.getKey();
                         Blob blob = (Blob) entry.getValue();
@@ -205,19 +209,30 @@ public class Main {
                     }
                 }
                 List<String> existedFiles = Utils.plainFilenamesIn(new File(WORKINGPATH));
-
+                Commit current = commitTree.getCurrentCommit();
                 for (String e: existedFiles) {
-                    Utils.restrictedDelete(e);
+                    if (!error) {
+                        if (current.getFiles().containsKey(e)) {
+                            Utils.restrictedDelete(e);
+                        }
+                        if (!stageFiles.containsKey(e) && !current.getFiles().containsKey(e)) {
+                            System.out.println("There is an untracked file in the way; delete it or add it first.");
+                            error = true;
+                            break;
+                        }
+                    }
                 }
 
-                for (Map.Entry entry: foundBranch.getFiles().entrySet()) {
-                    String key = (String) entry.getKey();
-                    Blob blob = (Blob) entry.getValue();
-                    Utils.writeObject(new File(key), blob);
+                if (!error) {
+                    for (Map.Entry entry : foundBranch.getFiles().entrySet()) {
+                        String key = (String) entry.getKey();
+                        Blob blob = (Blob) entry.getValue();
+                        Utils.writeContents(new File(key), blob.getContent());
+                    }
+                    commitTree.putCurrentBranch(args[0]);
+                    Utils.writeObject(commitFile, commitTree);
+                    Utils.writeObject(stageFile, new Stage());
                 }
-                commitTree.putCurrentBranch(args[0]);
-                Utils.writeObject(commitFile, commitTree);
-                Utils.writeObject(stageFile, new Stage());
             } else {
                 System.out.println(Utils.error( "No such branch exists.").getMessage());
             }
@@ -378,6 +393,18 @@ public class Main {
         } else {
             Commit commit = commitTree.commitsCopy.get(args[0]);
             commitTree.head.put(commitTree.getCurrentBranch(), commit);
+        }
+    }
+
+    public static void cmdrmbranch(String ...args) {
+        CommitTree commitTree = Utils.readObject(new File(COMMITPATH), CommitTree.class);
+        if (commitTree.currentBranch.equals(args[0])) {
+            System.out.println("Cannot remove the current branch.");
+        } else if (!commitTree.findBranch(args[0])) {
+            System.out.println("A branch with that name does not exist.");
+        } else {
+            commitTree.removeBranch(args[0]);
+            Utils.writeObject(new File(COMMITPATH), commitTree);
         }
     }
 
